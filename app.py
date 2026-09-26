@@ -11,7 +11,7 @@ pdf_file = st.file_uploader("PDF Upload Cheyu", type="pdf")
 if pdf_file:
     genai.configure(api_key=api_key)
     if pdf_file:
-    # ⭐⭐⭐⭐ IDI IKKADA PETTU - START ⭐⭐⭐⭐
+    
     file_size_mb = pdf_file.size / (1024*1024)
     st.info(f"File size: {file_size_mb:.1f} MB")
 
@@ -20,7 +20,6 @@ if pdf_file:
         max_pages_to_read = 50
     else:
         max_pages_to_read = 100
-    # ⭐⭐⭐⭐ END ⭐⭐⭐⭐
 
     genai.configure(api_key=api_key)
     reader = PdfReader(pdf_file)
