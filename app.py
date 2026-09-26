@@ -17,36 +17,55 @@ if pdf_file and api_key:
         t = page.extract_text()
         if t:
             text += t + "\n"
-    
+
     if len(text.strip()) < 50:
-        st.error("Idi scanned image PDF! Text extract kaledu. Text unna vere PDF try cheyu (like IOT pdf)")
-        st.info(f"Extracted characters: {len(text)}")
+        st.error("Idi scanned image PDF! Text extract kaledu.")
     else:
-        st.success(f"PDF Ready! {len(text)} characters read!")
-        
-    question = st.text_input("Question Adugu:")
-    
-    if st.button("Answer Kavali") and question:
-        with st.spinner("Answer ready chestunna..."):
-            model = genai.GenerativeModel("gemini-3.8-flash")
-            if len(text.strip()) < 50:
-                prompt = f"Question: {question}. Answer in simple points."
+        st.success(f"PDF Ready! {len(text)} characters")
+        st.info(f"Extracted characters: {len(text)}")
+
+        question = st.text_input("Question Adugu (diagram kavali ante diagram ani rayi)")
+
+        if st.button("Answer Kavali"):
+            if question.strip() == "":
+                st.warning("Question rayi Sowmya!")
             else:
-                prompt = f"Answer from these notes: {text[:15000]} \n\n Question: {question} \n Give answer in 5 simple points."
-            
-            response = model.generate_content(prompt)
-            st.write(response.text)
-            
-            
-            if "diagram" in question.lower():
-                st.subheader("📊 Diagram")
-                st.graphviz_chart('''
-                    digraph {
-                        Input -> Encoder -> Code -> Decoder -> Output
-                        Output -> Loss -> Backprop
-                        Backprop -> Encoder
-                        Backprop -> Decoder
-                    }
-                ''')
-else:
-    st.info("Upload PDF")
+                with st.spinner("Answer ready chestunna..."):
+                    model = genai.GenerativeModel("gemini-1.5-flash")
+                    prompt = f"Answer in simple Telugu + English mix in 5 points. PDF: {text[:12000]} Question: {question}"
+                    response = model.generate_content(prompt)
+                    st.write(response.text)
+
+                    # --- DIAGRAM RAVADANIKI PROCESS ---
+                    if "diagram" in question.lower():
+                        st.subheader("📊 Topic Related Diagram")
+
+                        if "reinforcement" in question.lower() or "reinforcement" in text.lower()[:2000]:
+                            st.graphviz_chart('''
+                                digraph {
+                                    rankdir=LR;
+                                    Agent [shape=box, style=filled, fillcolor=lightblue];
+                                    Environment [shape=box, style=filled, fillcolor=lightgreen];
+                                    Agent -> Environment [label=" Action "];
+                                    Environment -> Agent [label=" State + Reward "];
+                                }
+                            ''')
+                        elif "autoencoder" in question.lower():
+                            st.graphviz_chart('''
+                                digraph {
+                                    rankdir=LR;
+                                    Input [shape=box];
+                                    Encoder [shape=box, style=filled, fillcolor=orange];
+                                    Code [label="Code\\nBottleneck", shape=circle, style=filled, fillcolor=yellow];
+                                    Decoder [shape=box, style=filled, fillcolor=orange];
+                                    Output [shape=box];
+                                    Input -> Encoder -> Code -> Decoder -> Output;
+                                }
+                            ''')
+                        else:
+                            st.graphviz_chart('''
+                                digraph {
+                                    Input -> Processing -> Output;
+                                }
+                            ''')
+                        st.caption("Idi PDF lo unna topic batti vachina diagram. PDF photo same to same kadu, kani topic ki correct diagram ye!")
