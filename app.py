@@ -6,7 +6,7 @@ st.set_page_config(page_title="AI Study Assistant", page_icon="📚")
 st.title("📚 AI Study Assistant")
 st.caption("By Nunna Sowmya | 23B81A12D0")
 
-api_key = st.sidebar.text_input("Gemini API Key", type="password")
+api_key = st.secrets["Gemini_API_Key"]
 pdf_file = st.file_uploader("PDF Upload Cheyu", type="pdf")
 
 if pdf_file and api_key:
