@@ -3,84 +3,58 @@ from PyPDF2 import PdfReader
 import google.generativeai as genai
 
 st.set_page_config(page_title="AI Study Assistant", page_icon="📚")
-st.title("📚 AI Study Assistant")
-st.caption("By Nunna Sowmya | 23B81A12D0")
+st.title("📚 AI Study Assistant - Sowmya")
 
 api_key = st.secrets["GEMINI_API_KEY"]
 pdf_file = st.file_uploader("PDF Upload Cheyu", type="pdf")
 
-if pdf_file and api_key:
+if pdf_file:
     genai.configure(api_key=api_key)
+    model = genai.GenerativeModel("gemini-1.5-flash-latest")
+    
     reader = PdfReader(pdf_file)
-    text = ""
+    pdf_text = ""
     for page in reader.pages:
         t = page.extract_text()
         if t:
-            text += t + "\n"
+            pdf_text = pdf_text + t + "\n"
+    
+    st.success("PDF Ready!")
+    question = st.text_input("Question adugu (ex: autoencoder)")
+    
+    if st.button("Answer Kavali"):
+        # 1. PDF LO SAME TEXT SEARCH
+        st.subheader("1. Exact Text from PDF (Same to Same):")
+        keywords = question.lower().replace("diagram","").strip().split()
+        found_lines = []
+        for line in pdf_text.split("\n"):
+            for k in keywords:
+                if k in line.lower() and len(line.strip()) > 20:
+                    found_lines.append(line.strip())
+                    break
+        
+        if found_lines:
+            for line in found_lines[:8]:
+                st.write("- " + line)
+        else:
+            st.warning("Exact keyword PDF lo dorakaledu, kani related content kindha undi.")
+            st.write(pdf_text[:1000])
 
-    if len(text.strip()) < 50:
-        st.error("Idi scanned image PDF! Text extract kaledu.")
-    else:
-        st.success(f"PDF Ready! {len(text)} characters")
-        st.info(f"Extracted characters: {len(text)}")
+        # 2. ENGLISH EXPLANATION + DIAGRAM
+        st.subheader("2. Simple English Explanation:")
+        prompt2 = "Explain in simple ENGLISH 5 points: " + question + " Context: " + pdf_text[:8000]
+        res = model.generate_content(prompt2)
+        st.write(res.text)
 
-        question = st.text_input("Question Adugu (diagram kavali ante diagram ani rayi)")
-
-        if st.button("Answer Kavali"):
-            if question.strip() == "":
-                st.warning("Question rayi Sowmya!")
+        if "diagram" in question.lower():
+            st.subheader("3. Related Diagram:")
+            q = question.lower()
+            if "autoencoder" in q:
+                st.graphviz_chart('digraph { rankdir=LR; Input -> Encoder -> Code -> Decoder -> Output; Code [label="Bottleneck" shape=circle fillcolor=yellow style=filled]; }')
+            elif "boltzmann" in q:
+                st.graphviz_chart('digraph { rankdir=TB; v1 -> h1; v1 -> h2; v2 -> h1; v2 -> h2; v3 -> h1; v3 -> h2; }')
+            elif "reinforcement" in q:
+                st.graphviz_chart('digraph { rankdir=LR; Agent -> Environment [label="Action"]; Environment -> Agent [label="Reward"]; }')
             else:
-                with st.spinner("Answer ready chestunna..."):
-                    model = genai.GenerativeModel("gemini-3.8-flash")
-                    prompt = f"prompt = f"""
-You are a helpful study assistant. Your main source is the PDF content given below.
-
-PDF CONTENT:
-{text[:15000]}
-
-STUDENT QUESTION:
-{question}
-
-IMPORTANT RULES:
-1. Search the answer CAREFULLY inside PDF CONTENT. Even if spelling is a bit different, try to find it.
-2. If answer IS in PDF, start with "According to your PDF:" and explain in simple ENGLISH in 5 points.
-3. If answer is REALLY NOT in PDF after full search, then only say "This topic is not directly in your PDF, but here is the explanation from my knowledge:" and then explain in ENGLISH.
-4. Always answer in ENGLISH only.
-5. Keep answer short and easy for exam.
-"""
-                    response = model.generate_content(prompt)
-                    st.write(response.text)
-
-                    # --- DIAGRAM RAVADANIKI PROCESS ---
-                    if "diagram" in question.lower():
-                        st.subheader("📊 Topic Related Diagram")
-
-                        if "reinforcement" in question.lower() or "reinforcement" in text.lower()[:2000]:
-                            st.graphviz_chart('''
-                                digraph {
-                                    rankdir=LR;
-                                    Agent [shape=box, style=filled, fillcolor=lightblue];
-                                    Environment [shape=box, style=filled, fillcolor=lightgreen];
-                                    Agent -> Environment [label=" Action "];
-                                    Environment -> Agent [label=" State + Reward "];
-                                }
-                            ''')
-                        elif "autoencoder" in question.lower():
-                            st.graphviz_chart('''
-                                digraph {
-                                    rankdir=LR;
-                                    Input [shape=box];
-                                    Encoder [shape=box, style=filled, fillcolor=orange];
-                                    Code [label="Code\\nBottleneck", shape=circle, style=filled, fillcolor=yellow];
-                                    Decoder [shape=box, style=filled, fillcolor=orange];
-                                    Output [shape=box];
-                                    Input -> Encoder -> Code -> Decoder -> Output;
-                                }
-                            ''')
-                        else:
-                            st.graphviz_chart('''
-                                digraph {
-                                    Input -> Processing -> Output;
-                                }
-                            ''')
-                        st.caption("Idi PDF lo unna topic batti vachina diagram. PDF photo same to same kadu, kani topic ki correct diagram ye!")
+                st.graphviz_chart('digraph { Input -> Process -> Output; }')
+                                    
