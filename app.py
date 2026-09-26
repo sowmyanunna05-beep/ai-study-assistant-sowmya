@@ -12,7 +12,7 @@ if pdf_file:
     genai.configure(api_key=api_key)
     
     # Auto model finder - 3 models try chestundi, edhi work ayithe adhi
-    model_names = ["models/gemini-1.5-flash", "models/gemini-pro", "gemini-3.8-flash"]
+    model_names = ["models/gemini-3.8-flash", "models/gemini-pro", "gemini-3.8-flash"]
     model = None
     for m_name in model_names:
         try:
