@@ -32,7 +32,22 @@ if pdf_file and api_key:
             else:
                 with st.spinner("Answer ready chestunna..."):
                     model = genai.GenerativeModel("gemini-3.8-flash")
-                    prompt = f"Answer in clear and simple ENGLISH only. PDF: {text[:12000]} Question: {question}"
+                    prompt = f"prompt = f"""
+You are a helpful study assistant. Your main source is the PDF content given below.
+
+PDF CONTENT:
+{text[:15000]}
+
+STUDENT QUESTION:
+{question}
+
+IMPORTANT RULES:
+1. Search the answer CAREFULLY inside PDF CONTENT. Even if spelling is a bit different, try to find it.
+2. If answer IS in PDF, start with "According to your PDF:" and explain in simple ENGLISH in 5 points.
+3. If answer is REALLY NOT in PDF after full search, then only say "This topic is not directly in your PDF, but here is the explanation from my knowledge:" and then explain in ENGLISH.
+4. Always answer in ENGLISH only.
+5. Keep answer short and easy for exam.
+"""
                     response = model.generate_content(prompt)
                     st.write(response.text)
 
