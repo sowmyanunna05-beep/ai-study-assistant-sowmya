@@ -50,7 +50,7 @@ if pdf_file:
 
     if st.button("Generate Answer"):
         st.subheader("1. Exact Text from PDF (Same to Same):")
-        keys = question.lower().split()
+        keys = [w for w in question.lower().split() if w not in ["what","is","the","explain","about","with","a","an"] and len(w)>2]
         found = []
         for line in pdf_text.split("\n"):
             for k in keys:
