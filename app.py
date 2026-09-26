@@ -10,7 +10,7 @@ pdf_file = st.file_uploader("PDF Upload Cheyu", type="pdf")
 
 if pdf_file:
     genai.configure(api_key=api_key)
-    model = genai.GenerativeModel("gemini-1.5-flash-latest")
+    model = genai.GenerativeModel("gemini-3.8-flash-latest")
     
     reader = PdfReader(pdf_file)
     pdf_text = ""
