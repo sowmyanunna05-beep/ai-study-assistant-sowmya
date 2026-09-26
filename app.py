@@ -49,4 +49,4 @@ if pdf_file and api_key:
                     }
                 ''')
 else:
-    st.info("API Key + PDF pettu")
+    st.info("PDF Upload")
