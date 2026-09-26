@@ -10,7 +10,28 @@ pdf_file = st.file_uploader("PDF Upload Cheyu", type="pdf")
 
 if pdf_file:
     genai.configure(api_key=api_key)
-    
+    if pdf_file:
+    # ⭐⭐⭐⭐ IDI IKKADA PETTU - START ⭐⭐⭐⭐
+    file_size_mb = pdf_file.size / (1024*1024)
+    st.info(f"File size: {file_size_mb:.1f} MB")
+
+    if file_size_mb > 200:
+        st.warning("Pedda file! Speed kosam first 50 pages mathrame chaduvuthunna")
+        max_pages_to_read = 50
+    else:
+        max_pages_to_read = 100
+    # ⭐⭐⭐⭐ END ⭐⭐⭐⭐
+
+    genai.configure(api_key=api_key)
+    reader = PdfReader(pdf_file)
+
+    # Tarvata for loop lo kuda chinna change
+    pdf_text = ""
+    num_pages = min(len(reader.pages), max_pages_to_read) # <-- idi marchu
+    for i in range(num_pages): # <-- len(reader.pages) badulu num_pages
+        t = reader.pages[i].extract_text()
+        if t:
+            pdf_text += t + "\n"
     # Auto model finder - 3 models try chestundi, edhi work ayithe adhi
     model_names = ["models/gemini-3.8-flash", "models/gemini-pro", "gemini-3.8-flash"]
     model = None
