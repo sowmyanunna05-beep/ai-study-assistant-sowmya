@@ -32,7 +32,7 @@ if pdf_file and api_key:
             else:
                 with st.spinner("Answer ready chestunna..."):
                     model = genai.GenerativeModel("gemini-3.8-flash")
-                    prompt = f"Answer in simple Telugu + English mix in 5 points. PDF: {text[:12000]} Question: {question}"
+                    prompt = f"Answer in clear and simple ENGLISH only. PDF: {text[:12000]} Question: {question}"
                     response = model.generate_content(prompt)
                     st.write(response.text)
 
