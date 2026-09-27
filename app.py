@@ -54,12 +54,41 @@ if st.session_state.q_count >= 100:
 # ---------------------------------------------------------
 # GEMINI MODEL
 # ---------------------------------------------------------
-def get_gemini_response(prompt):
+def get_gemini_response(prompt_text):
 
-    models = [
-        "gemini-2.5-flash",
-        "gemini-2.0-flash",
-        "gemini-1.5-flash"
+    models_to_try = [
+        "gemini-3.8-flash",
+        "gemini-3.7-flash",
+        "gemini-3.6-flash",
+        "gemini-3.5-flash",
+        "gemini-3.5-flash-lite",
+        "gemini-2.5-flash"
+    ]
+
+    last_error = ""
+
+    for model_name in models_to_try:
+
+        try:
+            model = genai.GenerativeModel(model_name)
+
+            response = model.generate_content(
+                prompt_text
+            )
+
+            if response and response.text:
+                return response.text, model_name
+
+        except Exception as e:
+
+            last_error = str(e)
+
+            # Try next model
+            continue
+
+    raise Exception(
+        f"No available Gemini model. Last error: {last_error}"
+    )
     ]
 
     last_error = None
