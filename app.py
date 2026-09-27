@@ -21,14 +21,42 @@ except:
     st.error("GEMINI_API_KEY is missing in Streamlit Secrets.")
     st.stop()
 
-  models_to_try = (
-        "gemini-3.8-flash",
-        "gemini-3.7-flash",
-        "gemini-3.6-flash",
-        "gemini-3.5-flash",
-        "gemini-3.5-flash-lite",
-        "gemini-2.5-flash"
-  )
+ # ---------------- GEMINI MODELS ----------------
+MODELS = [
+    "gemini-3.8-flash",
+    "gemini-3.7-flash",
+    "gemini-3.6-flash",
+    "gemini-3.5-flash",
+    "gemini-3.5-flash-lite",
+    "gemini-2.5-flash"
+]
+
+def generate_answer(prompt):
+
+    last_error = ""
+
+    for model_name in MODELS:
+        try:
+            model = genai.GenerativeModel(model_name)
+
+            response = model.generate_content(
+                prompt,
+                generation_config={
+                    "temperature": 0.1,
+                    "max_output_tokens": 1200
+                }
+            )
+
+            if response and response.text:
+                return response.text, model_name
+
+        except Exception as e:
+            last_error = str(e)
+            continue
+
+    raise Exception(
+        f"No available Gemini model. Last error: {last_error}"
+    )
 
 # ---------------- DAILY LIMIT ----------------
 today = str(date.today())
