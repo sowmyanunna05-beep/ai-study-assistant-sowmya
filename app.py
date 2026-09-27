@@ -89,7 +89,7 @@ def get_gemini_response(prompt_text):
     raise Exception(
         f"No available Gemini model. Last error: {last_error}"
     )
-    ]
+    
 
     last_error = None
 
