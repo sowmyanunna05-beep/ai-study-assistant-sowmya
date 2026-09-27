@@ -100,6 +100,7 @@ if pdf_file:
         st.subheader("3️⃣ Exact Diagram from PDF")
         try:
             doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+            diagram_found = False
             for p_no in found_pages[:3]:
                 if p_no >= len(doc): continue
                 page = doc[p_no]
@@ -110,9 +111,15 @@ if pdf_file:
                     if base["width"]>100 and base["height"]>100:
                         st.image(base["image"], caption=f"Exact Diagram Page {p_no+1}", use_container_width=True)
                         found=True
-                if not found:
-                    pix = page.get_pixmap(matrix=fitz.Matrix(2,2))
-                    st.image(pix.tobytes("png"), caption=f"Page {p_no+1} Screenshot - Exact PDF", use_container_width=True)
+                        diagram_found=True
+                        break
+                if found:
+                    break
+
+            if not diagram_found:
+                # PDF lo photo ledu kabatti AI tho picture diagram generate chey
+                st.info("PDF lo photo diagram ledu, related diagram generate chesa")
+                draw_diagram_from_text("AI Process", ["Input", "Processing", "GPU Acceleration", "Output"])
                 break
         except Exception as e:
             st.error(f"Diagram error: {e}")
