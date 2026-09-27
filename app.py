@@ -2,112 +2,134 @@ import streamlit as st
 from PyPDF2 import PdfReader
 import google.generativeai as genai
 from datetime import date
-import streamlit.components.v1 as components
+import fitz # PyMuPDF - PDF lo image teeyadaniki
 
-st.set_page_config(page_title="AI Study Assistant Pro", page_icon="📚", layout="wide")
-st.title("📚 AI Study Assistant")
-st.caption("Exact PDF Answer + English Explanation + Auto Diagram | 1GB Support | 100 Q/Day")
+st.set_page_config(page_title="AI Study Assistant", page_icon="📚", layout="wide")
+st.title("📚 AI Study Assistant - Exact PDF Diagram")
+st.caption("Exact Text + Exact Diagram from PDF | 1GB | 100 Q/Day")
 
-# --- GEMINI CONFIG - LATEST MODEL ---
 api_key = st.secrets["GEMINI_API_KEY"]
 genai.configure(api_key=api_key)
 
-# --- DAILY LIMIT 100 ---
+# --- 100 Q LIMIT ---
 if "q_count" not in st.session_state:
     st.session_state.q_count = 0
     st.session_state.q_date = str(date.today())
-
 if st.session_state.q_date!= str(date.today()):
     st.session_state.q_count = 0
     st.session_state.q_date = str(date.today())
 
-st.sidebar.title("📊 Usage")
-st.sidebar.metric("Today Questions", f"{st.session_state.q_count} / 100")
+st.sidebar.metric("Today Usage", f"{st.session_state.q_count} / 100")
 if st.session_state.q_count >= 100:
-    st.error("Daily limit 100 reached. Tomorrow try chey.")
+    st.error("100 limit over")
     st.stop()
 
-# --- PDF UPLOAD - 1GB FAST ---
-pdf_file = st.file_uploader("📄 PDF Upload Cheyu (Max 1GB)", type="pdf")
+# --- PDF UPLOAD ---
+pdf_file = st.file_uploader("PDF Upload (Max 1GB)", type="pdf")
 
 if pdf_file:
     file_mb = pdf_file.size / (1024*1024)
-    st.info(f"File Size: {file_mb:.2f} MB")
+    st.info(f"File Size: {file_mb:.1f} MB")
 
-    if file_mb > 1024:
-        st.error("1GB kanna ekkuva undi. Konchem compress chey.")
-        st.stop()
+    # PDF bytes save chesukovali images kosam
+    pdf_bytes = pdf_file.getvalue()
 
-    @st.cache_data(show_spinner=False)
-    def get_pdf_text(file):
-        reader = PdfReader(file)
+    @st.cache_data
+    def get_pdf_data(pdf_bytes):
+        reader = PdfReader(pdf_file)
         text = ""
-        # Fast kosam first 40 pages only - 1GB ayina 15 sec lo aipothundi
-        pages_to_read = min(len(reader.pages), 40)
-        for i in range(pages_to_read):
+        pages_with_text = {}
+        for i in range(min(len(reader.pages), 50)):
             try:
                 t = reader.pages[i].extract_text()
                 if t:
                     text += t + "\n"
+                    pages_with_text[i] = t
             except:
-                continue
-        return text
+                pass
+        return text, pages_with_text
 
-    with st.spinner("📖 PDF Fast ga chaduvutunna..."):
-        pdf_text = get_pdf_text(pdf_file)
+    with st.spinner("Reading PDF..."):
+        pdf_text, pages_text = get_pdf_data(pdf_bytes)
 
-    st.success(f"✅ PDF Ready! {len(pdf_text)} characters read.")
+    st.success("PDF Ready!")
 
-    question = st.text_input("❓ Question Adugu (English lo)")
+    q = st.text_input("Question Adugu - Ex: What is Naive Bayes?")
 
-    if st.button("🚀 Generate Answer") and question:
-        if len(question.strip()) < 3:
-            st.warning("Question konchem peddaga adugu")
-            st.stop()
-
+    if st.button("🚀 Generate Exact Answer") and q:
         st.session_state.q_count += 1
+        keywords = [w.lower() for w in q.split() if len(w) > 3]
 
-        # --- PART 1: EXACT ANSWER FROM PDF ---
+        # --- PART 1: EXACT TEXT ---
         st.divider()
-        st.subheader("1️⃣ Exact Answer from PDF (Same to Same - For Exam)")
-        keywords = [w.lower() for w in question.split() if len(w) > 3]
-        found = []
-        for line in pdf_text.split("\n"):
-            clean = line.strip()
-            if len(clean) < 30:
-                continue
-            if any(k in clean.lower() for k in keywords):
-                found.append(clean)
+        st.subheader("1️⃣ Exact Answer from PDF (Same to Same)")
+        found_pages = []
+        found_lines = []
+        for p_no, p_text in pages_text.items():
+            for line in p_text.split("\n"):
+                if len(line.strip()) > 30 and any(k in line.lower() for k in keywords):
+                    found_lines.append(f"Page {p_no+1}: {line.strip()}")
+                    if p_no not in found_pages:
+                        found_pages.append(p_no)
 
-        if found:
-            for l in found[:6]:
+        if found_lines:
+            for l in found_lines[:8]:
                 st.write(f"▪️ {l}")
         else:
-            st.write("Exact match ee 40 pages lo dorakaledu, kindha explanation chudu.")
+            st.write("Exact text ee 50 pages lo dorakaledu")
+            found_pages = list(pages_text.keys())[:3] # first 3 pages diagrams chupiddam
 
-        # --- PART 2 & 3: EXPLANATION + AUTO DIAGRAM ---
+        # --- PART 2: SIMPLE EXPLANATION ---
         st.divider()
-        st.subheader("2️⃣ Simple Explanation (In English)")
-        st.subheader("3️⃣ Related Diagram (Auto Generated)")
+        st.subheader("2️⃣ Simple Explanation (English)")
+        try:
+            model = genai.GenerativeModel("gemini-2.0-flash-lite")
+            prompt = f"Explain simple English in 5 points: Q={q} PDF={pdf_text[:6000]}"
+            res = model.generate_content(prompt)
+            st.write(res.text)
+        except Exception as e:
+            st.error(f"AI Error: {e}")
+
+        # --- PART 3: EXACT DIAGRAM FROM PDF ---
+        st.divider()
+        st.subheader("3️⃣ Exact Diagram from PDF (Original)")
+        st.write(f"Question ki related pages: {found_pages} - vatilo diagrams unte chupistunna...")
 
         try:
-            # LATEST MODEL - 200/day free, fastest
-            model = genai.GenerativeModel("gemini-2.0-flash-lite")
+            doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+            diagram_found = False
 
-            prompt = f"""
-            You are a study assistant.
-            PDF Content: {pdf_text[:8000]}
-            Question: {question}
+            # Related pages lo images vethukutam
+            pages_to_check = found_pages if found_pages else range(min(len(doc), 10))
 
-            Instructions:
-            1. First, give Simple English explanation in 5-6 bullet points.
-            2. Then, give a RELATED diagram using mermaid syntax ONLY.
-            Format strictly like this:
-            EXPLANATION:
-            - point1
-            - point2
-            DIAGRAM:
-            ```mermaid
-            graph TD
-            A[Topic] --> B[Concept1]
-            A --> C[Concept2]
+            for p_no in pages_to_check:
+                page = doc[p_no]
+                images = page.get_images(full=True)
+
+                if images:
+                    for img_index, img in enumerate(images):
+                        xref = img[0]
+                        base_image = doc.extract_image(xref)
+                        image_bytes = base_image["image"]
+
+                        # Diagram size check - chinna icons kadu, pedda diagrams mathrame
+                        if base_image["width"] > 150 and base_image["height"] > 150:
+                            st.image(image_bytes, caption=f"Exact Diagram from Page {p_no+1} - From Your PDF", use_column_width=True)
+                            diagram_found = True
+
+                # Page ni full screenshot la kuda chupinchachu - diagram text tho unte
+                if not diagram_found and p_no in found_pages:
+                    pix = page.get_pixmap(matrix=fitz.Matrix(2, 2)) # High quality
+                    st.image(pix.tobytes("png"), caption=f"Full Page {p_no+1} Screenshot (Diagram with text) - Exact from PDF", use_column_width=True)
+                    diagram_found = True
+                    break
+
+            if not diagram_found:
+                st.warning("Ee pages lo extract cheyagalige diagram image ledu. PDF scanned ayite image raadu. Text diagrams ayite Part 1 lo vachayi.")
+                st.info("Tip: PDF lo diagram photo la unte ne exact vastundi. Text diagram ayite adi text lone vastundi.")
+
+        except Exception as e:
+            st.error(f"Diagram extract error: {e}. PyMuPDF install ayyinda check chey.")
+
+else:
+    st.info("👆 PDF upload chey, exact diagram vastundi")
