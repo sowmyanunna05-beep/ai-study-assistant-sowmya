@@ -522,12 +522,7 @@ Page [page number]
                 )
 
             # -------------------------------------------------
-            # QUESTION COUNT
-            # -------------------------------------------------
-            st.sidebar.metric(
-                "Questions Today",
-                f"{st.session_state.q_count} / 100"
-            )
+           
 
 else:
 
