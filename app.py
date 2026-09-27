@@ -4,7 +4,9 @@ import google.generativeai as genai
 import re
 from datetime import date
 
-# ---------------- PAGE ----------------
+# =====================================================
+# PAGE SETTINGS
+# =====================================================
 st.set_page_config(
     page_title="AI Study Assistant",
     page_icon="📚",
@@ -12,53 +14,82 @@ st.set_page_config(
 )
 
 st.title("📚 AI Study Assistant")
-st.caption("PDF-based answers • English • Diagram support • 100 Questions/Day")
+st.caption(
+    "PDF-based answers • English • Diagram support • 100 Questions/Day"
+)
 
-# ---------------- GEMINI ----------------
+# =====================================================
+# GEMINI API
+# =====================================================
 try:
-    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-except:
-    st.error("GEMINI_API_KEY is missing in Streamlit Secrets.")
+    genai.configure(
+        api_key=st.secrets["GEMINI_API_KEY"]
+    )
+except Exception:
+    st.error(
+        "GEMINI_API_KEY is missing. "
+        "Add it in Streamlit Secrets."
+    )
     st.stop()
 
- # ---------------- GEMINI MODELS ----------------
-MODELS = [
+
+# =====================================================
+# GEMINI MODELS
+# Newest → older fallback
+# =====================================================
+GEMINI_MODELS = [
     "gemini-3.8-flash",
     "gemini-3.7-flash",
     "gemini-3.6-flash",
     "gemini-3.5-flash",
     "gemini-3.5-flash-lite",
-    "gemini-2.5-flash"
+    "gemini-3.1-flash-lite",
+    "gemini-3-flash-preview",
+    "gemini-2.5-flash",
+    "gemini-2.5-pro"
 ]
 
+
+# =====================================================
+# GEMINI RESPONSE
+# =====================================================
 def generate_answer(prompt):
 
     last_error = ""
 
-    for model_name in MODELS:
+    for model_name in GEMINI_MODELS:
+
         try:
-            model = genai.GenerativeModel(model_name)
+
+            model = genai.GenerativeModel(
+                model_name
+            )
 
             response = model.generate_content(
-                prompt,
-                generation_config={
-                    "temperature": 0.1,
-                    "max_output_tokens": 1200
-                }
+                prompt
             )
 
             if response and response.text:
-                return response.text, model_name
+
+                return (
+                    response.text,
+                    model_name
+                )
 
         except Exception as e:
+
             last_error = str(e)
             continue
 
     raise Exception(
-        f"No available Gemini model. Last error: {last_error}"
+        "No available Gemini model.\n"
+        + last_error
     )
 
-# ---------------- DAILY LIMIT ----------------
+
+# =====================================================
+# DAILY QUESTION LIMIT
+# =====================================================
 today = str(date.today())
 
 if "count" not in st.session_state:
@@ -66,186 +97,387 @@ if "count" not in st.session_state:
     st.session_state.day = today
 
 if st.session_state.day != today:
+
     st.session_state.count = 0
     st.session_state.day = today
 
+
+# =====================================================
+# SIDEBAR
+# =====================================================
 st.sidebar.title("⚙️ Settings")
-st.sidebar.metric("Questions Today", f"{st.session_state.count} / 100")
+
+st.sidebar.metric(
+    "Questions Today",
+    f"{st.session_state.count} / 100"
+)
 
 if st.session_state.count >= 100:
-    st.error("🚫 Today's 100-question limit has been reached.")
+
+    st.error(
+        "🚫 Today's 100-question limit has been reached."
+    )
+
+    st.info(
+        "Please come back tomorrow."
+    )
+
     st.stop()
 
-# ---------------- PDF READER ----------------
+
+# =====================================================
+# READ PDF
+# =====================================================
+@st.cache_data(show_spinner=False)
 def read_pdf(pdf_bytes):
-    doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+
+    doc = fitz.open(
+        stream=pdf_bytes,
+        filetype="pdf"
+    )
+
     pages = []
 
     for i, page in enumerate(doc):
-        text = page.get_text("text").strip()
+
+        text = page.get_text(
+            "text"
+        ).strip()
 
         if text:
+
             pages.append({
                 "page": i + 1,
                 "text": text
             })
 
     doc.close()
+
     return pages
 
 
-# ---------------- FIND RELEVANT PAGES ----------------
-def find_pages(question, pages, limit=5):
+# =====================================================
+# FIND RELEVANT PAGES
+# =====================================================
+def find_relevant_pages(
+    question,
+    pages,
+    limit=5
+):
 
     words = {
-        w.lower()
-        for w in re.findall(r"[A-Za-z0-9]+", question)
-        if len(w) > 2
+        word.lower()
+        for word in re.findall(
+            r"[A-Za-z0-9]+",
+            question
+        )
+        if len(word) > 2
     }
 
     results = []
 
     for page in pages:
+
         text = page["text"].lower()
-        score = sum(word in text for word in words)
 
-        if score:
-            results.append((score, page))
+        score = sum(
+            word in text
+            for word in words
+        )
 
-    results.sort(reverse=True, key=lambda x: x[0])
+        if score > 0:
 
-    return [page for score, page in results[:limit]]
+            results.append(
+                (score, page)
+            )
+
+    results.sort(
+        key=lambda x: x[0],
+        reverse=True
+    )
+
+    return [
+        page
+        for score, page in results[:limit]
+    ]
 
 
-# ---------------- SHOW DIAGRAMS ONLY ----------------
-def show_diagrams(pdf_bytes, page_numbers):
+# =====================================================
+# SHOW ONLY ACTUAL PDF IMAGES
+# =====================================================
+def show_diagrams(
+    pdf_bytes,
+    page_numbers
+):
 
-    doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+    doc = fitz.open(
+        stream=pdf_bytes,
+        filetype="pdf"
+    )
+
     found = False
 
     for number in page_numbers:
+
+        if number < 1 or number > len(doc):
+            continue
+
         page = doc[number - 1]
 
-        for img in page.get_images(full=True):
+        images = page.get_images(
+            full=True
+        )
+
+        for image in images:
 
             try:
-                data = doc.extract_image(img[0])
 
-                if data["width"] >= 100 and data["height"] >= 100:
+                data = doc.extract_image(
+                    image[0]
+                )
+
+                width = data.get(
+                    "width",
+                    0
+                )
+
+                height = data.get(
+                    "height",
+                    0
+                )
+
+                if (
+                    width >= 100
+                    and height >= 100
+                ):
+
                     st.image(
                         data["image"],
-                        caption=f"Diagram/Image — Page {number}",
+                        caption=(
+                            f"Diagram/Image — "
+                            f"Page {number}"
+                        ),
                         use_container_width=True
                     )
+
                     found = True
 
-            except:
+            except Exception:
                 pass
 
     doc.close()
+
     return found
 
 
-# ---------------- UPLOAD ----------------
+# =====================================================
+# PDF UPLOAD
+# =====================================================
 pdf_file = st.file_uploader(
     "📄 Upload your PDF",
-    type="pdf"
+    type=["pdf"],
+    help="Maximum file size: 1 GB"
 )
 
+
+# =====================================================
+# NO PDF
+# =====================================================
 if not pdf_file:
 
-    st.info("👆 Upload a PDF to start studying.")
+    st.info(
+        "👆 Upload a PDF to start studying."
+    )
 
-    st.markdown("""
+    st.markdown(
+        """
 ### 📚 Features
 
 - 📄 PDF-based question answering
 - 🎯 Answers only from uploaded PDF
 - 🇬🇧 English answers
-- 📑 Page references
-- 🖼️ Diagram/image extraction
-- 🤖 Gemini AI
+- 📑 Relevant page references
+- 🖼️ PDF diagram/image extraction
+- 🤖 Multiple Gemini models
+- ⚡ Automatic model fallback
 - 🔢 100 questions per day
 - 📦 Up to 1 GB PDF
-""")
+"""
+    )
 
     st.stop()
 
 
-# ---------------- PROCESS PDF ----------------
+# =====================================================
+# FILE SIZE
+# =====================================================
 pdf_bytes = pdf_file.getvalue()
 
-if len(pdf_bytes) > 1024 * 1024 * 1024:
-    st.error("❌ PDF is larger than 1 GB.")
+MAX_SIZE = 1024 * 1024 * 1024
+
+if len(pdf_bytes) > MAX_SIZE:
+
+    st.error(
+        "❌ PDF is larger than 1 GB."
+    )
+
     st.stop()
 
-with st.spinner("📖 Reading PDF..."):
-    pages = read_pdf(pdf_bytes)
+
+# =====================================================
+# PROCESS PDF
+# =====================================================
+with st.spinner(
+    "📖 Reading PDF..."
+):
+
+    try:
+
+        pages = read_pdf(
+            pdf_bytes
+        )
+
+    except Exception as e:
+
+        st.error(
+            f"PDF reading error: {e}"
+        )
+
+        st.stop()
+
 
 if not pages:
-    st.error("⚠️ No readable text found in this PDF.")
+
+    st.error(
+        "⚠️ No readable text was found "
+        "in this PDF."
+    )
+
     st.stop()
 
-st.success(f"✅ PDF Ready — {len(pages)} pages processed")
 
-
-# ---------------- QUESTION ----------------
-question = st.text_input(
-    "🔎 Ask your question",
-    placeholder="Example: What is Artificial Intelligence?"
+st.success(
+    f"✅ PDF Ready — "
+    f"{len(pages)} pages processed"
 )
 
-if st.button(
+
+# =====================================================
+# QUESTION
+# =====================================================
+question = st.text_input(
+    "🔎 Ask your question",
+    placeholder=(
+        "Example: What is Artificial Intelligence?"
+    )
+)
+
+
+generate = st.button(
     "🚀 Generate Answer",
     type="primary",
     use_container_width=True
-):
+)
+
+
+# =====================================================
+# GENERATE ANSWER
+# =====================================================
+if generate:
 
     if not question.strip():
-        st.warning("Please enter a question.")
+
+        st.warning(
+            "Please enter a question."
+        )
+
         st.stop()
+
 
     if st.session_state.count >= 100:
-        st.error("Daily question limit reached.")
+
+        st.error(
+            "Daily question limit reached."
+        )
+
         st.stop()
 
+
+    # -------------------------------------------------
+    # SEARCH PDF
+    # -------------------------------------------------
+    with st.spinner(
+        "🔍 Searching your PDF..."
+    ):
+
+        relevant_pages = find_relevant_pages(
+            question,
+            pages
+        )
+
+
+    # -------------------------------------------------
+    # NO MATCH
+    # -------------------------------------------------
+    if not relevant_pages:
+
+        st.warning(
+            "❌ The answer is not available "
+            "in the uploaded PDF."
+        )
+
+        st.stop()
+
+
+    # Count valid question
     st.session_state.count += 1
 
-    # Find only relevant pages
-    with st.spinner("🔍 Searching your PDF..."):
-        relevant = find_pages(question, pages)
 
-    if not relevant:
-        st.warning(
-            "❌ The answer is not available in the uploaded PDF."
-        )
-        st.stop()
-
-    # Create small context
+    # -------------------------------------------------
+    # CREATE CONTEXT
+    # -------------------------------------------------
     context = "\n\n".join(
-        f"PDF PAGE {p['page']}:\n{p['text']}"
-        for p in relevant
+
+        f"PDF PAGE {page['page']}:\n"
+        f"{page['text']}"
+
+        for page in relevant_pages
     )
 
+
+    # Keep context manageable
     context = context[:30000]
 
-    # ---------------- AI PROMPT ----------------
+
+    # -------------------------------------------------
+    # AI PROMPT
+    # -------------------------------------------------
     prompt = f"""
 You are an AI Study Assistant.
 
-Answer the question ONLY using the PDF context below.
+Your job is to answer the user's question
+using ONLY the uploaded PDF.
 
-Rules:
-- Use only information from the PDF.
-- Do not use outside knowledge.
-- Do not invent information.
-- Answer in English.
-- Give the exact information needed for the question.
-- Do not repeat unrelated PDF content.
-- Do not include the PDF front page unless it contains the answer.
-- If the answer is not present, say:
+IMPORTANT RULES:
+
+1. Use ONLY information from the PDF.
+2. Do NOT use outside knowledge.
+3. Do NOT invent facts.
+4. Answer in English only.
+5. Give ONLY information relevant to the question.
+6. Do NOT include unrelated PDF content.
+7. Do NOT include the PDF front page unless
+   it contains the answer.
+8. Do NOT show or reproduce extra PDF pages.
+9. Keep the answer clear and easy to understand.
+10. Preserve important points from the PDF.
+11. If the answer is not available in the PDF,
+    say exactly:
+
 "The answer is not available in the uploaded PDF."
-- Mention the page number containing the answer.
+
+12. Mention the page number where the answer
+    was found.
 
 QUESTION:
 {question}
@@ -253,68 +485,107 @@ QUESTION:
 PDF CONTEXT:
 {context}
 
-Give the answer in this format:
+Give the response in this format:
 
 Answer:
-[Answer]
+[Relevant answer from the PDF]
 
 Source:
 Page [number]
 """
 
-    # ---------------- GENERATE ----------------
+
+    # -------------------------------------------------
+    # AI ANSWER
+    # -------------------------------------------------
     st.divider()
-    st.subheader("1️⃣ Exact Answer from PDF")
+
+    st.subheader(
+        "1️⃣ Exact Answer from PDF"
+    )
+
 
     try:
 
-        with st.spinner("🤖 Generating answer..."):
+        with st.spinner(
+            "🤖 Generating answer..."
+        ):
 
-            model = genai.GenerativeModel(MODEL)
-
-            response = model.generate_content(
-                prompt,
-                generation_config={
-                    "temperature": 0.1,
-                    "max_output_tokens": 1200
-                }
+            answer, model_used = generate_answer(
+                prompt
             )
 
-        st.write(response.text)
-        st.caption(f"Model: {MODEL}")
+
+        if answer:
+
+            st.write(answer)
+
+            st.caption(
+                f"🤖 Model used: {model_used}"
+            )
+
+        else:
+
+            st.warning(
+                "No answer was generated."
+            )
+
 
     except Exception as e:
-        st.error(f"AI Error: {e}")
 
-    # ---------------- SOURCE ----------------
+        st.error(
+            f"AI Error: {e}"
+        )
+
+
+    # -------------------------------------------------
+    # RELEVANT PAGES
+    # -------------------------------------------------
     st.divider()
-    st.subheader("2️⃣ Relevant PDF Pages")
 
-    numbers = [p["page"] for p in relevant]
+    st.subheader(
+        "2️⃣ Relevant PDF Pages"
+    )
+
+    page_numbers = [
+        page["page"]
+        for page in relevant_pages
+    ]
 
     st.write(
         "Relevant pages:",
-        ", ".join(map(str, numbers))
+        ", ".join(
+            map(str, page_numbers)
+        )
     )
 
-    # ---------------- DIAGRAMS ----------------
-    st.divider()
-    st.subheader("3️⃣ Diagram / PDF Visual")
 
-    if not show_diagrams(pdf_bytes, numbers[:3]):
+    # -------------------------------------------------
+    # DIAGRAMS
+    # -------------------------------------------------
+    st.divider()
+
+    st.subheader(
+        "3️⃣ Diagram / PDF Visual"
+    )
+
+    diagram_found = show_diagrams(
+        pdf_bytes,
+        page_numbers[:3]
+    )
+
+    if not diagram_found:
+
         st.info(
-            "No separate diagram/image was detected "
-            "on the relevant pages."
+            "No separate diagram/image was "
+            "detected on the relevant pages."
         )
 
-    # ---------------- COUNT ----------------
+
+    # -------------------------------------------------
+    # UPDATE QUESTION COUNT
+    # -------------------------------------------------
     st.sidebar.metric(
         "Questions Today",
         f"{st.session_state.count} / 100"
     )
-
-           
-
-                   
-          
-                  
