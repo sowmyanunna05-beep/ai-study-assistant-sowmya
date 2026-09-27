@@ -27,7 +27,7 @@ if pdf_file:
         if t:
             pdf_text += t + "\n"
     # Auto model finder - 3 models try chestundi, edhi work ayithe adhi
-    model_names = ["models/gemini-3.8-flash", "models/gemini-pro", "gemini-2.0-flash-lite"]
+    model_names = ["gemini-2.0-flash-lite", "gemini-1.5-flash", "gemini-2.0-flash"]
     model = None
     for m_name in model_names:
         try:
